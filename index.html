@@ -90,12 +90,40 @@
     setLink(name) { try { history.replaceState(null, '', '#' + name); } catch (e) {} },
   };
 
+  // SH 160 ABS ĐẶC BIỆT chỉ có màu Xám đen; màu khác ghi dưới dòng này (X.MỜ / Xanh mờ / Xám mờ / Xanh bơ)
+  // thực ra là SH 160 ABS THỂ THAO màu Xanh bơ (Andy xác nhận) → chuyển sang đúng dòng xe, đúng màu.
+  const khongDau = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
+  const SH160_DB = 'SH 160 ABS ĐẶC BIỆT', SH160_TT = 'SH 160 ABS THỂ THAO';
+  const sh160Sai = (r) => khongDau(r.xe) === khongDau(SH160_DB) && khongDau(r.mau) !== '' && !/xam den/.test(khongDau(r.mau));
+  const suaMau = (rows) => rows.map((r) => (sh160Sai(r) ? { ...r, xe: SH160_TT, mau: 'Xanh bơ' } : r));
+  const suaTonXe = (tonXe, tonMau) => {
+    const doi = {};                                  // ngay|head -> số xe chuyển ĐB → TT
+    for (const r of tonMau) if (sh160Sai(r)) { const k = r.ngay + '|' + r.head; doi[k] = (doi[k] || 0) + Number(r.sl || 0); }
+    const out = tonXe.map((r) => ({ ...r }));
+    for (const [k, n] of Object.entries(doi)) {
+      const [ngay, head] = k.split('|');
+      const tim = (xe) => out.find((r) => r.ngay === ngay && r.head === head && khongDau(r.xe) === khongDau(xe));
+      const db = tim(SH160_DB);
+      if (db) db.sl = Number(db.sl) - n;
+      const tt = tim(SH160_TT);
+      if (tt) tt.sl = Number(tt.sl) + n; else out.push({ ngay, head, xe: SH160_TT, sl: n });
+    }
+    return out.filter((r) => !(khongDau(r.xe) === khongDau(SH160_DB) && Number(r.sl) <= 0));
+  };
+
+  const raw = {};
   for (const name of FILES) {
     store[name] = { status: 'loading', data: null };
-    fetch('data/' + name + '.json', { cache: 'no-cache' })
+    raw[name] = fetch('data/' + name + '.json', { cache: 'no-cache' })
       .then((r) => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); })
-      .then((rows) => { store[name] = { status: 'ok', data: Array.isArray(rows) ? rows : [] }; version++; notify(); })
-      .catch((e) => { console.error(name, e); store[name] = { status: 'error', data: null, error: String(e) }; version++; notify(); });
+      .then((rows) => (Array.isArray(rows) ? rows : []));
+  }
+  for (const name of FILES) {
+    const p = name === 'ton_theo_xe'
+      ? Promise.all([raw.ton_theo_xe, raw.ton_theo_mau.catch(() => [])]).then(([x, m]) => suaTonXe(x, m))
+      : ['ton_theo_mau', 'giao_dich', 'muon_bd'].includes(name) ? raw[name].then(suaMau) : raw[name];
+    p.then((rows) => { store[name] = { status: 'ok', data: rows }; version++; notify(); })
+     .catch((e) => { console.error(name, e); store[name] = { status: 'error', data: null, error: String(e) }; version++; notify(); });
   }
   let rt = null;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { version++; notify(); }, 150); });
