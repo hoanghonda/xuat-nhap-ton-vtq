@@ -91,24 +91,38 @@
   };
 
   // SH 160 ABS ĐẶC BIỆT chỉ có màu Xám đen; màu khác ghi dưới dòng này (X.MỜ / Xanh mờ / Xám mờ / Xanh bơ)
-  // thực ra là SH 160 ABS THỂ THAO màu Xanh bơ (Andy xác nhận) → chuyển sang đúng dòng xe, đúng màu.
+  // thực ra là SH 160 ABS THỂ THAO màu Xanh bơ của HEAD 2 (Q2), dù sheet ghi ở HEAD 1 (Andy xác nhận)
+  // → chuyển sang đúng HEAD, đúng dòng xe, đúng màu; tồn của hai HEAD cộng/trừ theo.
   const khongDau = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
-  const SH160_DB = 'SH 160 ABS ĐẶC BIỆT', SH160_TT = 'SH 160 ABS THỂ THAO';
+  const SH160_DB = 'SH 160 ABS ĐẶC BIỆT', SH160_TT = 'SH 160 ABS THỂ THAO', SH160_HEAD = 'HEAD 2';
   const sh160Sai = (r) => khongDau(r.xe) === khongDau(SH160_DB) && khongDau(r.mau) !== '' && !/xam den/.test(khongDau(r.mau));
-  const suaMau = (rows) => rows.map((r) => (sh160Sai(r) ? { ...r, xe: SH160_TT, mau: 'Xanh bơ' } : r));
-  const suaTonXe = (tonXe, tonMau) => {
-    const doi = {};                                  // ngay|head -> số xe chuyển ĐB → TT
+  const suaMau = (rows) => rows.map((r) => (sh160Sai(r) ? { ...r, head: SH160_HEAD, xe: SH160_TT, mau: 'Xanh bơ' } : r));
+  const sh160Doi = (tonMau) => {                     // ngay|head gốc -> số xe chuyển sang HEAD 2 / THỂ THAO
+    const doi = {};
     for (const r of tonMau) if (sh160Sai(r)) { const k = r.ngay + '|' + r.head; doi[k] = (doi[k] || 0) + Number(r.sl || 0); }
+    return Object.entries(doi).map(([k, n]) => { const [ngay, head] = k.split('|'); return { ngay, head, n }; });
+  };
+  const suaTonXe = (tonXe, tonMau) => {
     const out = tonXe.map((r) => ({ ...r }));
-    for (const [k, n] of Object.entries(doi)) {
-      const [ngay, head] = k.split('|');
-      const tim = (xe) => out.find((r) => r.ngay === ngay && r.head === head && khongDau(r.xe) === khongDau(xe));
-      const db = tim(SH160_DB);
+    for (const { ngay, head, n } of sh160Doi(tonMau)) {
+      const tim = (h, xe) => out.find((r) => r.ngay === ngay && r.head === h && khongDau(r.xe) === khongDau(xe));
+      const db = tim(head, SH160_DB);
       if (db) db.sl = Number(db.sl) - n;
-      const tt = tim(SH160_TT);
-      if (tt) tt.sl = Number(tt.sl) + n; else out.push({ ngay, head, xe: SH160_TT, sl: n });
+      const tt = tim(SH160_HEAD, SH160_TT);
+      if (tt) tt.sl = Number(tt.sl) + n; else out.push({ ngay, head: SH160_HEAD, xe: SH160_TT, sl: n });
     }
     return out.filter((r) => !(khongDau(r.xe) === khongDau(SH160_DB) && Number(r.sl) <= 0));
+  };
+  const suaTong = (tong, tonMau) => {
+    const out = tong.map((r) => ({ ...r }));
+    const cong = (ngay, head, n) => {
+      const r = out.find((x) => x.ngay === ngay && x.head === head);
+      if (!r) return;
+      if (r.ton != null) r.ton = Number(r.ton) + n;
+      if (r.ton_thuc_te != null) r.ton_thuc_te = Number(r.ton_thuc_te) + n;
+    };
+    for (const { ngay, head, n } of sh160Doi(tonMau)) if (head !== SH160_HEAD) { cong(ngay, head, -n); cong(ngay, SH160_HEAD, n); }
+    return out;
   };
 
   const raw = {};
@@ -121,6 +135,8 @@
   for (const name of FILES) {
     const p = name === 'ton_theo_xe'
       ? Promise.all([raw.ton_theo_xe, raw.ton_theo_mau.catch(() => [])]).then(([x, m]) => suaTonXe(x, m))
+      : name === 'tong_ngay'
+      ? Promise.all([raw.tong_ngay, raw.ton_theo_mau.catch(() => [])]).then(([t, m]) => suaTong(t, m))
       : ['ton_theo_mau', 'giao_dich', 'muon_bd'].includes(name) ? raw[name].then(suaMau) : raw[name];
     p.then((rows) => { store[name] = { status: 'ok', data: rows }; version++; notify(); })
      .catch((e) => { console.error(name, e); store[name] = { status: 'error', data: null, error: String(e) }; version++; notify(); });
