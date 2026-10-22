@@ -48,9 +48,10 @@
   .site-foot { margin: 24px 0 8px; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; }
   .site-foot a { color: inherit; }
 </style>
+<script src="sheet.js"></script>
 <script>
 /* Lớp giả lập API `dash` của Dashboard (Claude) cho bản tĩnh trên GitHub Pages:
-   dữ liệu đọc từ thư mục data/*.json, không cần kết nối Google Drive. */
+   lịch sử đọc từ thư mục data/*.json, số hôm nay đọc trực tiếp từ Google Sheet TỒN KHO. */
 (function () {
   const FILES = ['tong_ngay', 'giao_dich', 'ton_theo_xe', 'ton_theo_mau', 'muon_bd', 'giao_hang'];
   const store = {};            // name -> { status: 'loading'|'ok'|'error', data }
@@ -125,22 +126,51 @@
     return out;
   };
 
-  const raw = {};
+  // Lịch sử (các ngày trước) đọc từ data/*.json; hôm nay đọc trực tiếp từ sheet TỒN KHO (sheet.js), làm mới mỗi phút.
+  const LIVE = ['tong_ngay', 'giao_dich', 'ton_theo_xe', 'ton_theo_mau', 'muon_bd'];
+  const LAM_MOI_MS = 60 * 1000;
+  for (const name of FILES) store[name] = { status: 'loading', data: null };
+  const json = {};
   for (const name of FILES) {
-    store[name] = { status: 'loading', data: null };
-    raw[name] = fetch('data/' + name + '.json', { cache: 'no-cache' })
+    json[name] = fetch('data/' + name + '.json', { cache: 'no-cache' })
       .then((r) => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); })
       .then((rows) => (Array.isArray(rows) ? rows : []));
   }
-  for (const name of FILES) {
-    const p = name === 'ton_theo_xe'
-      ? Promise.all([raw.ton_theo_xe, raw.ton_theo_mau.catch(() => [])]).then(([x, m]) => suaTonXe(x, m))
-      : name === 'tong_ngay'
-      ? Promise.all([raw.tong_ngay, raw.ton_theo_mau.catch(() => [])]).then(([t, m]) => suaTong(t, m))
-      : ['ton_theo_mau', 'giao_dich', 'muon_bd'].includes(name) ? raw[name].then(suaMau) : raw[name];
-    p.then((rows) => { store[name] = { status: 'ok', data: rows }; version++; notify(); })
-     .catch((e) => { console.error(name, e); store[name] = { status: 'error', data: null, error: String(e) }; version++; notify(); });
-  }
+  json.giao_hang
+    .then((rows) => { store.giao_hang = { status: 'ok', data: rows }; version++; notify(); })
+    .catch((e) => { console.error('giao_hang', e); store.giao_hang = { status: 'error', data: null, error: String(e) }; version++; notify(); });
+
+  const live = { status: 'loading', gio: null, ngay: null, error: null };
+  window.vtqLive = () => ({ ...live });
+  const dung = (data) => {
+    const set = (name, rows) => { store[name] = { status: 'ok', data: rows }; };
+    set('ton_theo_xe', suaTonXe(data.ton_theo_xe, data.ton_theo_mau));
+    set('tong_ngay', suaTong(data.tong_ngay, data.ton_theo_mau));
+    for (const name of ['ton_theo_mau', 'giao_dich', 'muon_bd']) set(name, suaMau(data[name]));
+    version++; notify();
+  };
+  let lichSu = null;
+  const lamMoi = async () => {
+    if (!lichSu) {
+      const rs = await Promise.all(LIVE.map((n) => json[n].catch((e) => { console.error(n, e); return null; })));
+      if (rs[0] == null) for (const name of LIVE) store[name] = { status: 'error', data: null, error: 'Không tải được data/' + name + '.json' };
+      lichSu = Object.fromEntries(LIVE.map((n, i) => [n, rs[i] || []]));
+    }
+    try {
+      const snap = VTQSheet.snapshot(await VTQSheet.fetchCsv(), lichSu);
+      Object.assign(live, { status: 'ok', gio: snap.gio, ngay: snap.ngay, error: null });
+      dung(VTQSheet.merge(lichSu, snap));
+    } catch (e) {
+      console.error('sheet', e);
+      Object.assign(live, { status: 'error', error: String(e.message || e) });
+      if (store.tong_ngay.status !== 'ok' && lichSu.tong_ngay.length) dung(lichSu); else { version++; notify(); }
+    }
+  };
+  let dangDoc = false;
+  const docSheet = () => { if (dangDoc) return; dangDoc = true; lamMoi().finally(() => { dangDoc = false; }); };
+  docSheet();
+  setInterval(() => { if (!document.hidden) docSheet(); }, LAM_MOI_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) docSheet(); });
   let rt = null;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { version++; notify(); }, 150); });
 })();
@@ -172,6 +202,12 @@
   .vtq-ban { color: var(--color-bad); } .vtq-nhap { color: var(--color-ok); }
   .vtq-meta { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
   .vtq-meta .stale { color: var(--color-warn); }
+  .vtq-live { margin-top: var(--cds-gap-xs); }
+  .vtq-live::before { content: ""; display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: var(--color-fg-muted); margin-right: .4rem; vertical-align: 1px; }
+  .vtq-live.ok::before { background: var(--color-ok); animation: live 2s ease-in-out infinite; }
+  .vtq-live.err { color: var(--color-warn); } .vtq-live.err::before { background: var(--color-warn); }
+  @keyframes live { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .vtq-live.ok::before { animation: none; } }
   .vtq-note { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-style: italic; }
   .vtq-chart { position: relative; min-height: 220px; }
   .vtq-chart svg { display: block; width: 100%; height: auto; }
@@ -310,6 +346,7 @@
     <div>
       <h1 class="vtq-title">Xuất nhập tồn VTQ</h1>
       <p class="vtq-takeaway dash-skeleton" id="takeaway" data-source="tong_ngay">Đang tải lịch sử tồn kho…</p>
+      <p class="vtq-meta vtq-live" id="live-status">Đang đọc Google Sheet TỒN KHO…</p>
     </div>
     <div class="vtq-head-ctl">
       <label class="vtq-search" for="tim-xe">
@@ -1349,7 +1386,7 @@
 </script>
 
 <footer class="site-foot">
-  <span>Nguồn: sheet TỒN KHO (tab VTQ1, VTQ2.Mới) qua tác vụ theo dõi tồn kho hằng ngày · Cập nhật dữ liệu: <span id="site-updated">—</span></span>
+  <span>Nguồn: <a href="https://docs.google.com/spreadsheets/d/1y4aPypQBrybTe3icd6ZwCzdCkRBGI-4EfCI2O3o7-fM/edit" target="_blank" rel="noopener">sheet TỒN KHO</a> (tab VTQ1, VTQ2.Mới), đọc trực tiếp mỗi phút; các ngày trước lấy từ bản chụp lưu mỗi giờ · Cập nhật dữ liệu: <span id="site-updated">—</span></span>
   <span>Bản tĩnh của bảng “Xuất nhập tồn VTQ” trên Claude, xuất lên GitHub Pages.</span>
 </footer>
 <script>
@@ -1357,7 +1394,13 @@
     const T = dash.data('tong_ngay');
     if (T.status !== 'ok') return;
     const d = T.data.map((r) => r.ngay).sort().pop();
-    document.getElementById('site-updated').textContent = d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '—';
+    const L = window.vtqLive();
+    document.getElementById('site-updated').textContent = (L.status === 'ok' && L.ngay === d ? L.gio + ' ' : '') + (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '—');
+    const el = document.getElementById('live-status');
+    el.className = 'vtq-meta vtq-live' + (L.status === 'ok' ? ' ok' : L.status === 'error' ? ' err' : '');
+    el.textContent = L.status === 'ok' ? `Trực tiếp từ Google Sheet · cập nhật lúc ${L.gio}, tự làm mới mỗi phút`
+      : L.status === 'error' ? `Không đọc được Google Sheet (${L.error}) – đang hiện bản chụp ${d ? d.slice(8, 10) + '/' + d.slice(5, 7) : ''}; sẽ thử lại sau 1 phút`
+      : 'Đang đọc Google Sheet TỒN KHO…';
   });
 </script>
 </main>
