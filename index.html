@@ -807,7 +807,10 @@
     nb.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'mouse') return; if (nhomHover[head]) { nhomHover[head] = null; veTonXe(); } });
   });
   const timInput = $('tim-xe'), timXoa = $('tim-xe-xoa');
-  timInput.addEventListener('input', () => { timXe = timInput.value; timXoa.hidden = !timXe.trim(); drawTonTab(); });
+  // đọc lại ô tìm khi gõ/xóa/kết thúc bộ gõ tiếng Việt – có bộ gõ không phát 'input' khi xóa chữ đang gõ dở
+  const dongBoTim = () => { if (timInput.value === timXe) return; timXe = timInput.value; timXoa.hidden = !timXe.trim(); drawTonTab(); };
+  ['input', 'search', 'change', 'keyup', 'compositionend', 'blur'].forEach((ev) => timInput.addEventListener(ev, dongBoTim));
+  window.addEventListener('pageshow', dongBoTim);
   timXoa.addEventListener('click', () => { timInput.value = ''; timXe = ''; timXoa.hidden = true; drawTonTab(); timInput.focus(); });
 
   document.documentElement.style.setProperty('--dash-c0', dash.colors[0]);
@@ -980,6 +983,7 @@
       document.querySelector('.vtq-muon').hidden = ms.length === 0; }
 
     // Kết quả tìm mẫu xe ở cả 2 HEAD
+    timXe = timInput.value; timXoa.hidden = !timXe.trim(); // ô tìm là nguồn sự thật, tránh lệch với chữ đang hiện
     const terms = chuanHoa(timXe);
     const kq = $('ket-qua-tim'), kqBody = $('kq-body'), kqEmpty = $('kq-empty');
     kq.hidden = terms.length === 0;
