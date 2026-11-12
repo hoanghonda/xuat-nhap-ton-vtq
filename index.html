@@ -374,10 +374,16 @@
     <article class="vtq-card" id="head1">
       <h2>HEAD 1 · VTQ1 Bình Dương</h2>
       <div class="vtq-kpis">
-        <div class="vtq-kpi vtq-kpi-ton"><span class="vtq-kpi-label">Tồn thực tế</span><span class="vtq-num dash-skeleton" id="h1-ton" data-source="tong_ngay" data-field="ton_thuc_te">—</span><span class="vtq-delta">sheet <span id="h1-ton-sheet" data-source="tong_ngay" data-field="ton">—</span> + mượn BD <span id="h1-muon" data-source="tong_ngay" data-field="muon_bd">—</span></span><span class="vtq-delta" id="h1-delta"><span id="h1-delta-v" data-source="chenh_lech" data-field="chenh">—</span><span id="h1-delta-t"></span></span></div>
+        <div class="vtq-kpi vtq-kpi-ton"><span class="vtq-kpi-label">Tồn thực tế</span><span class="vtq-num dash-skeleton" id="h1-ton" data-source="tong_ngay" data-field="ton_thuc_te">—</span><span class="vtq-delta">sheet <span id="h1-ton-sheet" data-source="tong_ngay" data-field="ton">—</span> + mượn VTQ2 <span id="h1-muon" data-source="tong_ngay" data-field="muon_bd">—</span></span><span class="vtq-delta" id="h1-delta"><span id="h1-delta-v" data-source="chenh_lech" data-field="chenh">—</span><span id="h1-delta-t"></span></span></div>
         <div class="vtq-kpi"><span class="vtq-kpi-label">Bán / xuất</span><span class="vtq-num vtq-ban dash-skeleton" id="h1-ban" data-source="tong_ngay" data-field="ban">—</span></div>
         <div class="vtq-kpi"><span class="vtq-kpi-label">Nhập về</span><span class="vtq-num vtq-nhap dash-skeleton" id="h1-nhap" data-source="tong_ngay" data-field="nhap">—</span></div>
       </div>
+      <details class="vtq-muon" id="h1-muon-box" hidden><summary>Xe mượn VTQ2 đang ở showroom</summary>
+        <table data-source="giao_dich" data-row-key="ngay,head,loai,xe,mau">
+          <thead><tr><th data-field="xe">Xe</th><th class="n" data-field="sl">SL</th></tr></thead>
+          <tbody id="h1-muon-body"></tbody>
+        </table>
+      </details>
     </article>
     <article class="vtq-card" id="head2">
       <h2>HEAD 2 · VTQ2 Quận 2</h2>
@@ -386,10 +392,10 @@
         <div class="vtq-kpi"><span class="vtq-kpi-label">Bán / xuất</span><span class="vtq-num vtq-ban dash-skeleton" id="h2-ban" data-source="tong_ngay" data-field="ban">—</span></div>
         <div class="vtq-kpi"><span class="vtq-kpi-label">Nhập về</span><span class="vtq-num vtq-nhap dash-skeleton" id="h2-nhap" data-source="tong_ngay" data-field="nhap">—</span></div>
       </div>
-      <details class="vtq-muon" hidden><summary>Xe mượn BD đang ở showroom</summary>
+      <details class="vtq-muon" id="h2-muon-box" hidden><summary>Xe mượn BD đang ở showroom</summary>
         <table data-source="giao_dich" data-row-key="ngay,head,loai,xe,mau">
           <thead><tr><th data-field="xe">Xe</th><th class="n" data-field="sl">SL</th></tr></thead>
-          <tbody id="muon-body"></tbody>
+          <tbody id="h2-muon-body"></tbody>
         </table>
       </details>
     </article>
@@ -398,7 +404,7 @@
   <section class="vtq-grid" id="bieu-do">
     <article class="vtq-card" id="chart-ton">
       <h3>Tồn kho theo ngày</h3>
-      <p class="vtq-sub">Tồn thực tế (sheet + mượn BD), mỗi HEAD một đường.</p>
+      <p class="vtq-sub">Tồn thực tế (sheet + xe mượn của HEAD kia), mỗi HEAD một đường.</p>
       <div class="vtq-legend"><span style="--sw: var(--dash-c0)">HEAD 1</span><span style="--sw: var(--dash-c1)">HEAD 2</span></div>
       <div class="vtq-chart dash-skeleton" id="chart-ton-box" data-source="tong_ngay"></div>
     </article>
@@ -629,7 +635,7 @@
   dash.calc('chenh_lech', {
     inputs: ['tong_ngay'],
     title: 'Chênh lệch tồn so với ngày trước',
-    description: 'Với mỗi HEAD, tồn thực tế (sheet + mượn BD; chưa có thì tồn sheet) của ngày này trừ ngày ghi nhận liền trước.',
+    description: 'Với mỗi HEAD, tồn thực tế (sheet + xe mượn; chưa có thì tồn sheet) của ngày này trừ ngày ghi nhận liền trước.',
     fn: (tong_ngay) => {
       const out = [];
       for (const head of [...new Set(tong_ngay.map((r) => r.head))]) {
@@ -644,12 +650,12 @@
   dash.calc('ton_mau_hai_head', {
     inputs: ['ton_theo_mau', 'muon_bd'],
     title: 'Tồn từng màu ở cả 2 HEAD',
-    description: 'Với mỗi (ngày, dòng xe, màu), SL tồn của HEAD 1 và HEAD 2 đặt cạnh nhau và cộng lại (HEAD 2 gồm cả xe mượn BD, ghi riêng ở cột muon2); thêm một dòng tổng cho dòng xe với màu = "*".',
+    description: 'Với mỗi (ngày, dòng xe, màu), SL tồn của HEAD 1 và HEAD 2 đặt cạnh nhau và cộng lại (gồm cả xe mượn: HEAD 1 mượn VTQ2 ở cột muon1, HEAD 2 mượn BD ở cột muon2); thêm một dòng tổng cho dòng xe với màu = "*".',
     fn: (ton_theo_mau, muon_bd) => {
       const m = new Map();
       const add = (k, ngay, xe, mau, head, v, muon) => {
-        const o = m.get(k) || { ngay, xe, mau, head1: null, head2: null, tong: 0, muon2: 0 };
-        if (head === 'HEAD 1') o.head1 = (o.head1 || 0) + v; else if (head === 'HEAD 2') { o.head2 = (o.head2 || 0) + v; if (muon) o.muon2 += v; }
+        const o = m.get(k) || { ngay, xe, mau, head1: null, head2: null, tong: 0, muon1: 0, muon2: 0 };
+        if (head === 'HEAD 1') { o.head1 = (o.head1 || 0) + v; if (muon) o.muon1 += v; } else if (head === 'HEAD 2') { o.head2 = (o.head2 || 0) + v; if (muon) o.muon2 += v; }
         o.tong += v; m.set(k, o);
       };
       for (const r of ton_theo_mau) {
@@ -668,7 +674,7 @@
   dash.calc('mau_text', {
     inputs: ['ton_theo_mau', 'muon_bd'],
     title: 'Màu còn hàng theo dòng xe',
-    description: 'Với mỗi (ngày, HEAD, dòng xe), ghép các màu còn hàng thành một chuỗi "Màu SL · Màu SL"; xe mượn BD của HEAD 2 cộng vào màu tương ứng.',
+    description: 'Với mỗi (ngày, HEAD, dòng xe), ghép các màu còn hàng thành một chuỗi "Màu SL · Màu SL"; xe mượn của mỗi HEAD cộng vào màu tương ứng.',
     fn: (ton_theo_mau, muon_bd) => {
       const m = new Map();
       for (const r of [...ton_theo_mau, ...muon_bd]) {
@@ -682,12 +688,12 @@
   dash.calc('ton_hai_head', {
     inputs: ['ton_theo_xe', 'muon_bd'],
     title: 'Tồn từng dòng xe ở cả 2 HEAD',
-    description: 'Với mỗi (ngày, dòng xe), SL tồn của HEAD 1 và HEAD 2 đặt cạnh nhau và cộng lại; HEAD 2 gồm cả xe mượn BD (cột muon2); HEAD không có dòng xe đó để trống.',
+    description: 'Với mỗi (ngày, dòng xe), SL tồn của HEAD 1 và HEAD 2 đặt cạnh nhau và cộng lại; gồm cả xe mượn (HEAD 1 mượn VTQ2: cột muon1, HEAD 2 mượn BD: cột muon2); HEAD không có dòng xe đó để trống.',
     fn: (ton_theo_xe, muon_bd) => {
       const m = new Map();
       for (const r of ton_theo_xe) {
         const k = r.ngay + '|' + r.xe;
-        const o = m.get(k) || { ngay: r.ngay, xe: r.xe, head1: null, head2: null, tong: 0, muon2: 0 };
+        const o = m.get(k) || { ngay: r.ngay, xe: r.xe, head1: null, head2: null, tong: 0, muon1: 0, muon2: 0 };
         const v = Number(r.sl) || 0;
         if (r.head === 'HEAD 1') o.head1 = v; else if (r.head === 'HEAD 2') o.head2 = v;
         o.tong += v;
@@ -695,9 +701,10 @@
       }
       for (const r of muon_bd) {
         const k = r.ngay + '|' + r.xe;
-        const o = m.get(k) || { ngay: r.ngay, xe: r.xe, head1: null, head2: null, tong: 0, muon2: 0 };
+        const o = m.get(k) || { ngay: r.ngay, xe: r.xe, head1: null, head2: null, tong: 0, muon1: 0, muon2: 0 };
         const v = Number(r.sl) || 0;
-        if (r.head === 'HEAD 2') { o.head2 = (o.head2 || 0) + v; o.muon2 += v; o.tong += v; }
+        if (r.head === 'HEAD 1') { o.head1 = (o.head1 || 0) + v; o.muon1 += v; o.tong += v; }
+        else if (r.head === 'HEAD 2') { o.head2 = (o.head2 || 0) + v; o.muon2 += v; o.tong += v; }
         m.set(k, o);
       }
       return [...m.values()];
@@ -706,7 +713,7 @@
   dash.calc('ton_xe_thuc_te', {
     inputs: ['ton_theo_xe', 'muon_bd'],
     title: 'Tồn thực tế từng dòng xe',
-    description: 'Với mỗi (ngày, HEAD, dòng xe): sl = SL trên sheet + xe mượn BD (HEAD 2); sl_sheet và muon ghi riêng.',
+    description: 'Với mỗi (ngày, HEAD, dòng xe): sl = SL trên sheet + xe mượn (HEAD 1 mượn VTQ2, HEAD 2 mượn BD); sl_sheet và muon ghi riêng.',
     fn: (ton_theo_xe, muon_bd) => {
       const m = new Map();
       for (const r of ton_theo_xe) m.set(r.ngay + '|' + r.head + '|' + r.xe, { ngay: r.ngay, head: r.head, xe: r.xe, sl: Number(r.sl) || 0, sl_sheet: Number(r.sl) || 0, muon: 0 });
@@ -717,7 +724,7 @@
   dash.calc('ton_theo_nhom', {
     inputs: ['ton_xe_thuc_te'],
     title: 'Tồn theo nhóm xe',
-    description: 'Cộng SL tồn thực tế (sheet + mượn BD) theo nhóm: xe điện (tên có "e:" hoặc UC), xe côn (WIN, WINNER, CBR, CB), xe số (ALPHA, RSX, FUTURE, CUP, WAVE, BLADE), còn lại xe ga.',
+    description: 'Cộng SL tồn thực tế (sheet + xe mượn) theo nhóm: xe điện (tên có "e:" hoặc UC), xe côn (WIN, WINNER, CBR, CB), xe số (ALPHA, RSX, FUTURE, CUP, WAVE, BLADE), còn lại xe ga.',
     fn: (ton_xe_thuc_te) => {
       const ton_theo_xe = ton_xe_thuc_te;
       const nhom = (xe) => { const u = String(xe).toUpperCase(); if (/E:|\bUC\d|CUV/.test(u)) return 'Xe điện'; if (/^(WIN|WINNER|CBR|CB\d)/.test(u)) return 'Xe côn'; if (/^(ALPHA|RSX|FUTURE|CUP|SUPER CUB|BLADE|WAVE)/.test(u)) return 'Xe số'; return 'Xe ga'; };
@@ -962,7 +969,7 @@
       const body = $(`gd${i + 1}-body`), empty = $(`gd${i + 1}-empty`);
       body.replaceChildren();
       if (G.status !== 'ok') { empty.hidden = false; empty.textContent = G.status === 'loading' ? 'Đang tải…' : 'Không tải được'; return; }
-      const rs = G.data.filter((r) => r.ngay === ngay && r.head === head && r.loai !== 'Mượn BD').sort((a, b) => (a.loai === b.loai ? b.sl - a.sl : a.loai < b.loai ? -1 : 1));
+      const rs = G.data.filter((r) => r.ngay === ngay && r.head === head && !/^Mượn/.test(r.loai)).sort((a, b) => (a.loai === b.loai ? b.sl - a.sl : a.loai < b.loai ? -1 : 1));
       empty.hidden = rs.length > 0; empty.textContent = 'Không có giao dịch.';
       for (const r of rs) {
         const tr = document.createElement('tr');
@@ -973,11 +980,11 @@
       }
     });
 
-    // Xe mượn BD (HEAD 2)
-    { const mb = $('muon-body'); mb.replaceChildren();
-      const ms = G.status === 'ok' ? G.data.filter((r) => r.ngay === ngay && r.head === 'HEAD 2' && r.loai === 'Mượn BD') : [];
+    // Xe mượn: HEAD 1 mượn VTQ2, HEAD 2 mượn BD
+    HEADS.forEach((head, hi) => { const mb = $(`h${hi + 1}-muon-body`); mb.replaceChildren();
+      const ms = G.status === 'ok' ? G.data.filter((r) => r.ngay === ngay && r.head === head && /^Mượn/.test(r.loai)) : [];
       for (const r of ms) { const tr = document.createElement('tr'); tr.dataset.key = [r.ngay, r.head, r.loai, r.xe, r.mau].map(enc).join(','); const a = document.createElement('td'); a.textContent = r.xe; const b = document.createElement('td'); b.className = 'n'; b.textContent = String(r.sl); tr.append(a, b); mb.appendChild(tr); }
-      document.querySelector('.vtq-muon').hidden = ms.length === 0; }
+      $(`h${hi + 1}-muon-box`).hidden = ms.length === 0; });
 
     // Kết quả tìm mẫu xe ở cả 2 HEAD
     const terms = chuanHoa(timXe);
@@ -985,15 +992,15 @@
     kq.hidden = terms.length === 0;
     kqBody.replaceChildren();
     if (terms.length) {
-      const H2 = fix(dash.data('ton_hai_head'), ['head1', 'head2', 'tong', 'muon2']);
-      const M2 = fix(dash.data('ton_mau_hai_head'), ['head1', 'head2', 'tong', 'muon2']);
+      const H2 = fix(dash.data('ton_hai_head'), ['head1', 'head2', 'tong', 'muon1', 'muon2']);
+      const M2 = fix(dash.data('ton_mau_hai_head'), ['head1', 'head2', 'tong', 'muon1', 'muon2']);
       const mauRows = M2.status === 'ok' ? M2.data.filter((r) => r.ngay === ngay && r.mau !== '*') : [];
       const mauCua = (xe) => mauRows.filter((r) => r.xe === xe).sort((a, b) => (b.tong - a.tong) || (a.mau < b.mau ? -1 : 1));
       const hits = H2.status === 'ok' ? H2.data.filter((r) => r.ngay === ngay && khopXe(r.xe + ' ' + mauCua(r.xe).map((c) => c.mau).join(' '), terms)).sort((a, b) => (b.tong - a.tong) || (a.xe < b.xe ? -1 : 1)) : [];
       kqEmpty.hidden = hits.length > 0 || H2.status !== 'ok';
       const tongCo = hits.reduce((a, r) => a + (r.tong || 0), 0);
-      const tongMuon = hits.reduce((a, r) => a + (r.muon2 || 0), 0);
-      $('ket-qua-tim-title').textContent = hits.length ? `"${timXe.trim()}" – ${hits.length} dòng xe, còn ${tongCo} xe (HEAD 1: ${hits.reduce((a, r) => a + (r.head1 || 0), 0)} · HEAD 2: ${hits.reduce((a, r) => a + (r.head2 || 0), 0)}${tongMuon ? `, gồm ${tongMuon} mượn BD` : ''}) – ngày ${fmtNgay(ngay)}` : `"${timXe.trim()}" – ngày ${fmtNgay(ngay)}`;
+      const tongMuon1 = hits.reduce((a, r) => a + (r.muon1 || 0), 0), tongMuon = hits.reduce((a, r) => a + (r.muon2 || 0), 0);
+      $('ket-qua-tim-title').textContent = hits.length ? `"${timXe.trim()}" – ${hits.length} dòng xe, còn ${tongCo} xe (HEAD 1: ${hits.reduce((a, r) => a + (r.head1 || 0), 0)}${tongMuon1 ? `, gồm ${tongMuon1} mượn VTQ2` : ''} · HEAD 2: ${hits.reduce((a, r) => a + (r.head2 || 0), 0)}${tongMuon ? `, gồm ${tongMuon} mượn BD` : ''}) – ngày ${fmtNgay(ngay)}` : `"${timXe.trim()}" – ngày ${fmtNgay(ngay)}`;
       const dong = (r, cls, label) => {
         const tr = document.createElement('tr');
         tr.dataset.key = [r.ngay, r.xe, r.mau == null ? '*' : r.mau].map(enc).join(',');
@@ -1003,7 +1010,7 @@
           const td = document.createElement('td');
           if (ci === 0) { if (cls === 'mau') td.append(oMau(v, true), document.createTextNode(String(v))); else td.textContent = v; }
           else if (v == null) { td.textContent = '–'; td.className = c + ' ghi'; }
-          else { td.className = c + (v === 0 ? ' het' : ''); if (ci === 3 && cls === 'xe') { const b = document.createElement('b'); b.textContent = String(v); td.appendChild(b); } else td.textContent = v === 0 ? 'hết' : String(v); if (ci === 2 && r.muon2) td.title = `gồm ${r.muon2} xe mượn BD`; }
+          else { td.className = c + (v === 0 ? ' het' : ''); if (ci === 3 && cls === 'xe') { const b = document.createElement('b'); b.textContent = String(v); td.appendChild(b); } else td.textContent = v === 0 ? 'hết' : String(v); if (ci === 1 && r.muon1) td.title = `gồm ${r.muon1} xe mượn VTQ2`; if (ci === 2 && r.muon2) td.title = `gồm ${r.muon2} xe mượn BD`; }
           tr.appendChild(td);
         });
         kqBody.appendChild(tr);
@@ -1056,7 +1063,7 @@
         const tdm = document.createElement('td'); tdm.className = 'mau-txt';
         const mt = MT.status === 'ok' ? MT.data.find((q) => q.ngay === ngay && q.head === head && q.xe === r.xe) : null;
         if (mt && mt.mau_text) for (const part of String(mt.mau_text).split(' · ')) { const m = /^(.*)\s(\d+)$/.exec(part); tdm.appendChild(m ? chipMau(m[1], m[2]) : chipMau(part)); }
-        if (r.muon) { const mc = document.createElement('span'); mc.className = 'mau-chip muon-chip'; mc.textContent = `+${r.muon} mượn BD`; tdm.appendChild(mc); }
+        if (r.muon) { const mc = document.createElement('span'); mc.className = 'mau-chip muon-chip'; mc.textContent = `+${r.muon} mượn ${head === 'HEAD 1' ? 'VTQ2' : 'BD'}`; tdm.appendChild(mc); }
         const td3 = document.createElement('td'); td3.className = 'bar';
         const track = document.createElement('div'); track.className = 'bar-track';
         const fill = document.createElement('div'); fill.className = 'bar-fill'; fill.style.width = (100 * r.sl / max) + '%'; fill.style.setProperty('--sw', dash.colors[i]);

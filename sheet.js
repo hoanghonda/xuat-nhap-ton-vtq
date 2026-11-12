@@ -42,7 +42,7 @@
   };
   const CHUA_MAU = '(chưa ghi màu)';
 
-  // Một tab (VTQ1 / VTQ2.Mới) → các dòng xe, màu, tổng, ghi chú mượn BD
+  // Một tab (VTQ1 / VTQ2.Mới) → các dòng xe, màu, tổng, ghi chú xe mượn (VTQ2: "Xe mượn BD", VTQ1: "Xe mượn VTQ2")
   function parseTab(rows) {
     const nhanNgay = (rows.find((r) => /^NGÀY \d+ THÁNG \d+ NĂM \d+/i.test(r[0] || '')) || [''])[0];
     const xe = [], mau = [];
@@ -68,10 +68,10 @@
     }
     if (tong == null) tong = xe.reduce((s, r) => s + r.sl, 0);
 
-    // khối "Xe mượn BD": các ô chữ ở các dòng ngay dưới, tới dòng trống đầu tiên
+    // khối "Xe mượn BD" / "XE MƯỢN VTQ2": các ô chữ ở các dòng ngay dưới, tới dòng trống đầu tiên
     const muon = [];
     for (let k = i; k < rows.length; k++) {
-      if (!/^xe m(ượ|uo)n bd/i.test(rows[k][0] || '')) continue;
+      if (!/^xe muon\b/.test(khongDau(rows[k][0]))) continue;
       for (let n = k; n < rows.length; n++) {
         const r = rows[n].slice(0, 13);
         if (n > k && (r[0] || !r.some(Boolean))) break;
@@ -136,13 +136,14 @@
 
     for (const t of TABS) {
       const tab = tabs[t.head], head = t.head;
-      const muon = head === 'HEAD 2' ? tab.muon.map((s) => docMuon(s, dongXe, mauCot)) : [];
+      const muon = tab.muon.map((s) => docMuon(s, dongXe, mauCot));
+      const loaiMuon = head === 'HEAD 1' ? 'Mượn VTQ2' : 'Mượn BD';
       const soMuon = muon.reduce((s, r) => s + r.sl, 0);
       for (const r of tab.xe) out.ton_theo_xe.push({ ngay, head, xe: r.xe, sl: r.sl });
       for (const r of tab.mau) out.ton_theo_mau.push({ ngay, head, xe: r.xe, mau: r.mau, sl: r.sl });
       for (const r of muon) {
         out.muon_bd.push({ ngay, head, xe: r.xe, mau: r.mau, sl: r.sl, mo_ta: r.mo_ta });
-        out.giao_dich.push({ ngay, head, loai: 'Mượn BD', xe: r.xe, mau: r.mau, sl: r.sl, ghi_chu: r.mo_ta });
+        out.giao_dich.push({ ngay, head, loai: loaiMuon, xe: r.xe, mau: r.mau, sl: r.sl, ghi_chu: r.mo_ta });
       }
 
       // bán/nhập: so từng (dòng xe, màu) với bản chụp gần nhất trước hôm nay

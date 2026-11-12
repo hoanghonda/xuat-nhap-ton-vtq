@@ -16,7 +16,7 @@ Trang chạy trên GitHub Pages và **đọc trực tiếp Google Sheet TỒN KH
 | `data/giao_dich.json` | Từng giao dịch bán/xuất, nhập về, mượn BD theo dòng xe – màu |
 | `data/ton_theo_xe.json` | Tồn theo (ngày, HEAD, dòng xe) |
 | `data/ton_theo_mau.json` | Tồn theo (ngày, HEAD, dòng xe, màu) |
-| `data/muon_bd.json` | Xe VTQ2 mượn của VTQ1 đang ở showroom VTQ2 |
+| `data/muon_bd.json` | Xe mượn đang ở showroom của HEAD kia: VTQ2 mượn của VTQ1 (BD) và VTQ1 mượn của VTQ2 |
 | `data/giao_hang.json` | Kế hoạch giao hàng HVN tháng 10 cho VTQ2 (tab "Lịch xe về") |
 
 ## Cập nhật dữ liệu
