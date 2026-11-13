@@ -363,7 +363,7 @@
     <p class="vtq-hint" id="ket-qua-tim-hint">Tồn theo dòng xe và màu ở ngày đang chọn; tìm được cả theo màu (vd: lead đỏ, vision trắng). Gõ tắt: tc = tiêu chuẩn, đb = đặc biệt, tt = thể thao, cc = cao cấp.</p>
     <div class="vtq-tbl-wrap">
       <table data-source="ton_mau_hai_head" data-row-key="ngay,xe,mau">
-        <thead><tr><th data-field="xe">Dòng xe / màu</th><th class="n" data-field="head1">HEAD 1 · Bình Dương</th><th class="n" data-field="head2">HEAD 2 · Quận 2</th><th class="n" data-field="tong">Cả 2 HEAD</th></tr></thead>
+        <thead><tr><th data-field="xe">Dòng xe / màu</th><th class="n" data-field="head1">HEAD 1 · Bình Dương</th><th class="n" data-field="head2">HEAD 2 · Quận 2</th></tr></thead>
         <tbody id="kq-body"></tbody>
       </table>
       <p class="empty" id="kq-empty" hidden>Không có dòng xe nào khớp.</p>
@@ -1003,19 +1003,18 @@
       const mauCua = (xe) => mauRows.filter((r) => r.xe === xe).sort((a, b) => (b.tong - a.tong) || (a.mau < b.mau ? -1 : 1));
       const hits = H2.status === 'ok' ? H2.data.filter((r) => r.ngay === ngay && khopXe(r.xe + ' ' + mauCua(r.xe).map((c) => c.mau).join(' '), terms)).sort((a, b) => (b.tong - a.tong) || (a.xe < b.xe ? -1 : 1)) : [];
       kqEmpty.hidden = hits.length > 0 || H2.status !== 'ok';
-      const tongCo = hits.reduce((a, r) => a + (r.tong || 0), 0);
       const tongMuon1 = hits.reduce((a, r) => a + (r.muon1 || 0), 0), tongMuon = hits.reduce((a, r) => a + (r.muon2 || 0), 0);
-      $('ket-qua-tim-title').textContent = hits.length ? `"${timXe.trim()}" – ${hits.length} dòng xe, còn ${tongCo} xe (HEAD 1: ${hits.reduce((a, r) => a + (r.head1 || 0), 0)}${tongMuon1 ? `, gồm ${tongMuon1} mượn VTQ2` : ''} · HEAD 2: ${hits.reduce((a, r) => a + (r.head2 || 0), 0)}${tongMuon ? `, gồm ${tongMuon} mượn BD` : ''}) – ngày ${fmtNgay(ngay)}` : `"${timXe.trim()}" – ngày ${fmtNgay(ngay)}`;
+      $('ket-qua-tim-title').textContent = hits.length ? `"${timXe.trim()}" – ${hits.length} dòng xe · HEAD 1: ${hits.reduce((a, r) => a + (r.head1 || 0), 0)}${tongMuon1 ? `, gồm ${tongMuon1} mượn VTQ2` : ''} · HEAD 2: ${hits.reduce((a, r) => a + (r.head2 || 0), 0)}${tongMuon ? `, gồm ${tongMuon} mượn BD` : ''} – ngày ${fmtNgay(ngay)}` : `"${timXe.trim()}" – ngày ${fmtNgay(ngay)}`;
       const dong = (r, cls, label) => {
         const tr = document.createElement('tr');
         tr.dataset.key = [r.ngay, r.xe, r.mau == null ? '*' : r.mau].map(enc).join(',');
         tr.className = cls + ' ' + (r.tong > 0 ? 'co' : 'khong');
-        const cells = [[label, ''], [r.head1, 'n'], [r.head2, 'n'], [r.tong, 'n']];
+        const cells = [[label, ''], [r.head1, 'n'], [r.head2, 'n']];
         cells.forEach(([v, c], ci) => {
           const td = document.createElement('td');
           if (ci === 0) { if (cls === 'mau') td.append(oMau(v, true), document.createTextNode(String(v))); else td.textContent = v; }
           else if (v == null) { td.textContent = '–'; td.className = c + ' ghi'; }
-          else { td.className = c + (v === 0 ? ' het' : ''); if (ci === 3 && cls === 'xe') { const b = document.createElement('b'); b.textContent = String(v); td.appendChild(b); } else td.textContent = v === 0 ? 'hết' : String(v); if (ci === 1 && r.muon1) td.title = `gồm ${r.muon1} xe mượn VTQ2`; if (ci === 2 && r.muon2) td.title = `gồm ${r.muon2} xe mượn BD`; }
+          else { td.className = c + (v === 0 ? ' het' : ''); td.textContent = v === 0 ? 'hết' : String(v); if (ci === 1 && r.muon1) td.title = `gồm ${r.muon1} xe mượn VTQ2`; if (ci === 2 && r.muon2) td.title = `gồm ${r.muon2} xe mượn BD`; }
           tr.appendChild(td);
         });
         kqBody.appendChild(tr);
