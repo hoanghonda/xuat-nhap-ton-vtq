@@ -9,7 +9,7 @@ Trang chạy trên GitHub Pages và **đọc trực tiếp Google Sheet TỒN KH
 | File | Nội dung |
 |---|---|
 | `index.html` | Trang bảng (toàn bộ CSS/JS nằm trong file) |
-| `sheet.js` | Đọc CSV của sheet TỒN KHO, dựng bản chụp hôm nay (tồn theo xe/màu, xe mượn BD, bán/nhập so với ngày trước) |
+| `sheet.js` | Đọc CSV của sheet TỒN KHO, dựng bản chụp hôm nay (tồn theo xe/màu, xe mượn, bán/nhập so với ngày trước); đọc các tab "Bình Dương_/Quận 2_Lịch xe về dự kiến Tháng …" để hiện ngày xe dự kiến về cạnh từng HEAD trong kết quả tìm |
 | `scripts/snapshot.mjs` | Ghi bản chụp hôm nay vào `data/*.json` (GitHub Actions chạy mỗi giờ) |
 | `d3.v7.min.js` | Thư viện vẽ biểu đồ d3 v7.9.0 |
 | `data/tong_ngay.json` | Một dòng mỗi (ngày, HEAD): tồn sheet, mượn BD, tồn thực tế, bán, nhập, nhãn ngày sheet, ghi chú |

@@ -149,6 +149,20 @@
     for (const name of ['ton_theo_mau', 'giao_dich', 'muon_bd']) set(name, suaMau(data[name]));
     version++; notify();
   };
+  // Lịch xe về dự kiến của từng HEAD: đọc thẳng các tab "…_Lịch xe về dự kiến Tháng …" trên sheet, 10 phút đọc lại một lần
+  store.lich_ve = { status: 'loading', data: null };
+  let lichLuc = 0;
+  const docLich = async (csvTon) => {
+    if (Date.now() - lichLuc < 10 * 60 * 1000) return;
+    lichLuc = Date.now();
+    try {
+      store.lich_ve = { status: 'ok', data: VTQSheet.lichXeVe(await VTQSheet.fetchLich(), csvTon) };
+    } catch (e) {
+      console.error('lich_ve', e); lichLuc = 0;
+      if (store.lich_ve.status !== 'ok') store.lich_ve = { status: 'error', data: null, error: String(e.message || e) };
+    }
+    version++; notify();
+  };
   let lichSu = null;
   const lamMoi = async () => {
     if (!lichSu) {
@@ -157,9 +171,11 @@
       lichSu = Object.fromEntries(LIVE.map((n, i) => [n, rs[i] || []]));
     }
     try {
-      const snap = VTQSheet.snapshot(await VTQSheet.fetchCsv(), lichSu);
+      const csvTon = await VTQSheet.fetchCsv();
+      const snap = VTQSheet.snapshot(csvTon, lichSu);
       Object.assign(live, { status: 'ok', gio: snap.gio, ngay: snap.ngay, error: null });
       dung(VTQSheet.merge(lichSu, snap));
+      docLich(csvTon);
     } catch (e) {
       console.error('sheet', e);
       Object.assign(live, { status: 'error', error: String(e.message || e) });
@@ -263,6 +279,11 @@
   #ket-qua-tim tr.mau td { color: var(--color-fg-muted); border-bottom-style: dashed; }
   #ket-qua-tim tr.mau td:first-child { padding-left: 1.6rem; }
   #ket-qua-tim tr.xe td { font-weight: var(--cds-font-weight-medium); }
+  #ket-qua-tim th.ve, #ket-qua-tim td.ve { text-align: left; padding-left: .9rem; white-space: nowrap; }
+  #ket-qua-tim td.ve { font-size: var(--cds-font-size-caption); font-weight: 400; color: var(--color-fg-muted); }
+  #ket-qua-tim td.ve b { font-weight: var(--cds-font-weight-medium); color: var(--color-fg); }
+  #ket-qua-tim td.ve .them { opacity: .75; }
+  #ket-qua-tim th:first-child, #ket-qua-tim td:first-child { min-width: 9rem; }
   .vtq td.mau-txt { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
   .vtq .sw { display: inline-block; width: 1.05em; height: 1.05em; border-radius: 3px; vertical-align: -0.18em; margin-right: .35em; flex: none;
     border: 1px solid rgba(0,0,0,.22); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
@@ -360,10 +381,10 @@
 
   <section class="vtq-card" id="ket-qua-tim" hidden>
     <h3 id="ket-qua-tim-title">Kết quả tìm</h3>
-    <p class="vtq-hint" id="ket-qua-tim-hint">Tồn theo dòng xe và màu ở ngày đang chọn; tìm được cả theo màu (vd: lead đỏ, vision trắng). Gõ tắt: tc = tiêu chuẩn, đb = đặc biệt, tt = thể thao, cc = cao cấp.</p>
+    <p class="vtq-hint" id="ket-qua-tim-hint">Tồn theo dòng xe và màu ở ngày đang chọn, kèm ngày xe dự kiến về (số xe trong ngoặc) theo tab lịch xe về của từng HEAD; tìm được cả theo màu (vd: lead đỏ, vision trắng). Gõ tắt: tc = tiêu chuẩn, đb = đặc biệt, tt = thể thao, cc = cao cấp.</p>
     <div class="vtq-tbl-wrap">
       <table data-source="ton_mau_hai_head" data-row-key="ngay,xe,mau">
-        <thead><tr><th data-field="xe">Dòng xe / màu</th><th class="n" data-field="head1">HEAD 1 · Bình Dương</th><th class="n" data-field="head2">HEAD 2 · Quận 2</th></tr></thead>
+        <thead><tr><th data-field="xe">Dòng xe / màu</th><th class="n" data-field="head1">HEAD 1 · Bình Dương</th><th class="ve" data-source="lich_ve" data-field="ngay">Dự kiến về</th><th class="n" data-field="head2">HEAD 2 · Quận 2</th><th class="ve" data-source="lich_ve" data-field="ngay">Dự kiến về</th></tr></thead>
         <tbody id="kq-body"></tbody>
       </table>
       <p class="empty" id="kq-empty" hidden>Không có dòng xe nào khớp.</p>
@@ -1000,8 +1021,32 @@
       const H2 = fix(dash.data('ton_hai_head'), ['head1', 'head2', 'tong', 'muon1', 'muon2']);
       const M2 = fix(dash.data('ton_mau_hai_head'), ['head1', 'head2', 'tong', 'muon1', 'muon2']);
       const mauRows = M2.status === 'ok' ? M2.data.filter((r) => r.ngay === ngay && r.mau !== '*') : [];
-      const mauCua = (xe) => mauRows.filter((r) => r.xe === xe).sort((a, b) => (b.tong - a.tong) || (a.mau < b.mau ? -1 : 1));
-      const hits = H2.status === 'ok' ? H2.data.filter((r) => r.ngay === ngay && khopXe(r.xe + ' ' + mauCua(r.xe).map((c) => c.mau).join(' '), terms)).sort((a, b) => (b.tong - a.tong) || (a.xe < b.xe ? -1 : 1)) : [];
+      // lịch xe về từ ngày đang chọn trở đi: head|xe|màu (màu '*' = cả dòng xe) → Map(ngày → số xe)
+      const LV = dash.data('lich_ve'), lich = new Map();
+      if (LV.status === 'ok') for (const r of LV.data) if (r.ngay >= ngay) for (const mau of [r.mau, '*']) {
+        const k = r.head + '|' + r.xe + '|' + mau, m = lich.get(k) || new Map();
+        m.set(r.ngay, (m.get(r.ngay) || 0) + Number(r.sl || 0)); lich.set(k, m);
+      }
+      const oVe = (head, xe, mau) => {
+        const td = document.createElement('td'); td.className = 've';
+        const m = lich.get(head + '|' + xe + '|' + mau);
+        if (!m) { td.textContent = LV.status === 'ok' ? '–' : LV.status === 'error' ? '?' : '…'; td.classList.add('ghi'); if (LV.status === 'error') td.title = 'Không đọc được tab lịch xe về'; return td; }
+        const ds = [...m].sort((a, b) => (a[0] < b[0] ? -1 : 1)), HIEN = 3;
+        ds.slice(0, HIEN).forEach(([d, n], i) => { if (i) td.append(' · '); const b = document.createElement('b'); b.textContent = d.slice(8, 10) + '/' + d.slice(5, 7); td.append(b, ` (${n})`); });
+        if (ds.length > HIEN) { const sp = document.createElement('span'); sp.className = 'them'; sp.textContent = ` · +${ds.length - HIEN} ngày`; td.appendChild(sp); }
+        td.title = `${head} – dự kiến về ${ds.reduce((a, x) => a + x[1], 0)} xe: ` + ds.map(([d, n]) => `${d.slice(8, 10)}/${d.slice(5, 7)} (${n})`).join(', ');
+        return td;
+      };
+      const mauCua = (xe) => {
+        const co = mauRows.filter((r) => r.xe === xe);
+        // màu chưa có trong kho nhưng có trong lịch xe về
+        for (const k of lich.keys()) { const [, x, mau] = k.split('|'); if (x === xe && mau !== '*' && !co.some((r) => r.mau === mau)) co.push({ ngay, xe, mau, head1: null, head2: null, tong: 0, muon1: 0, muon2: 0 }); }
+        return co.sort((a, b) => (b.tong - a.tong) || (a.mau < b.mau ? -1 : 1));
+      };
+      // dòng xe đang hết ở cả 2 HEAD (không còn dòng tồn) nhưng có trong lịch xe về
+      const xeNgay = H2.status === 'ok' ? H2.data.filter((r) => r.ngay === ngay) : [];
+      if (H2.status === 'ok') for (const xe of new Set([...lich.keys()].map((k) => k.split('|')[1]))) if (!xeNgay.some((r) => r.xe === xe)) xeNgay.push({ ngay, xe, head1: null, head2: null, tong: 0, muon1: 0, muon2: 0 });
+      const hits = H2.status === 'ok' ? xeNgay.filter((r) => khopXe(r.xe + ' ' + mauCua(r.xe).map((c) => c.mau).join(' '), terms)).sort((a, b) => (b.tong - a.tong) || (a.xe < b.xe ? -1 : 1)) : [];
       kqEmpty.hidden = hits.length > 0 || H2.status !== 'ok';
       const tongMuon1 = hits.reduce((a, r) => a + (r.muon1 || 0), 0), tongMuon = hits.reduce((a, r) => a + (r.muon2 || 0), 0);
       $('ket-qua-tim-title').textContent = hits.length ? `"${timXe.trim()}" – ${hits.length} dòng xe · HEAD 1: ${hits.reduce((a, r) => a + (r.head1 || 0), 0)}${tongMuon1 ? `, gồm ${tongMuon1} mượn VTQ2` : ''} · HEAD 2: ${hits.reduce((a, r) => a + (r.head2 || 0), 0)}${tongMuon ? `, gồm ${tongMuon} mượn BD` : ''} – ngày ${fmtNgay(ngay)}` : `"${timXe.trim()}" – ngày ${fmtNgay(ngay)}`;
@@ -1016,6 +1061,7 @@
           else if (v == null) { td.textContent = '–'; td.className = c + ' ghi'; }
           else { td.className = c + (v === 0 ? ' het' : ''); td.textContent = v === 0 ? 'hết' : String(v); if (ci === 1 && r.muon1) td.title = `gồm ${r.muon1} xe mượn VTQ2`; if (ci === 2 && r.muon2) td.title = `gồm ${r.muon2} xe mượn BD`; }
           tr.appendChild(td);
+          if (ci > 0) tr.appendChild(oVe(HEADS[ci - 1], r.xe, r.mau == null ? '*' : r.mau));
         });
         kqBody.appendChild(tr);
       };

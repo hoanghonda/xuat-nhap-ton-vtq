@@ -54,7 +54,7 @@
       if (!a || /^LOẠI XE/i.test(a)) continue;
       const sl = soNguyen(r[1]);
       if (sl == null) continue;
-      xe.push({ xe: a, sl });
+      xe.push({ xe: a, sl, cot: header.slice(2).filter(Boolean) });
       let cong = 0;
       for (let j = 2; j < r.length; j++) {
         const v = soNguyen(r[j]);
@@ -83,8 +83,8 @@
   }
 
   // "2 sh160 đặc biệt xám đen" → { sl: 2, xe: 'SH 160 ABS ĐẶC BIỆT', mau: 'Xám đen' }, đối chiếu tên dòng xe/màu trên sheet
-  const TAT = { tc: 'tieu chuan', db: 'dac biet', tt: 'the thao', cc: 'cao cap', cd: 'co dien', gh: 'gioi han', 'g/h': 'gioi han', mo: 'sh mode', fu: 'future', win: 'winner r', x: 'xanh' };
-  const tachTu = (t) => khongDau(t).replace(/x\./g, 'x ').replace(/([a-z])(\d)/g, '$1 $2').replace(/[^a-z0-9/: ]+/g, ' ').split(/\s+/).filter(Boolean)
+  const TAT = { tc: 'tieu chuan', db: 'dac biet', tt: 'the thao', cc: 'cao cap', cd: 'co dien', gh: 'gioi han', 'g/h': 'gioi han', mo: 'sh mode', fu: 'future', win: 'winner r', cub: 'super cub', x: 'xanh' };
+  const tachTu = (t) => khongDau(String(t || '').normalize('NFC').replace(/mờ/gi, 'mof')).replace(/x\./g, 'x ').replace(/([a-z])(\d)/g, '$1 $2').replace(/[^a-z0-9/: ]+/g, ' ').split(/\s+/).filter(Boolean)
     .flatMap((w) => (TAT[w] ? TAT[w].split(' ') : [w]));
   function docMuon(moTa, dongXe, mauCot) {
     const m = String(moTa).trim().match(/^(\d+)\s*(.*)$/);
@@ -95,6 +95,7 @@
     for (const ten of dongXe) {
       const tx = [...new Set(tachTu(ten))];
       if (!co.has(tx[0])) continue;
+      if (tu.some((w) => /^\d{3}$/.test(w) && !tx.includes(w))) continue;        // phân khối (125/160/350) phải khớp
       const trung = tx.filter((w) => co.has(w)).length;
       const diem = trung + trung / tx.length / 2;
       if (!best || diem > best.diem) best = { ten, tx, diem };
@@ -118,21 +119,102 @@
     return { ngay: `${p.year}-${p.month}-${p.day}`, gio: `${p.hour}:${p.minute}` };
   };
 
+  // tên dòng xe và các màu đang dùng trên 2 tab tồn kho, để đối chiếu cách ghi tắt (xe mượn, lịch xe về)
+  function tenTrenSheet(tabs) {
+    const dongXe = [...new Set(TABS.flatMap((t) => tabs[t.head].xe.map((r) => r.xe)))];
+    const mauCot = (xe) => {
+      const dung = new Map();
+      const cung = (ten) => /^(SH|ADV|ICON)/i.test(ten) === /^(SH|ADV|ICON)/i.test(xe);
+      for (const t of TABS) for (const r of tabs[t.head].xe) if (cung(r.xe)) for (const c of r.cot || []) if (!dung.has(tenMau(xe, c))) dung.set(tenMau(xe, c), 0);   // cột màu chưa có xe
+      for (const t of TABS) for (const r of tabs[t.head].mau) if (r.cot && cung(r.xe)) dung.set(tenMau(xe, r.cot), (dung.get(tenMau(xe, r.cot)) || 0) + r.sl + (r.xe === xe ? 1000 : 0));
+      const rieng = new Set(TABS.flatMap((t) => tabs[t.head].xe.filter((r) => r.xe === xe).flatMap((r) => (r.cot || []).map((c) => tenMau(xe, c)))));
+      return [...dung].map(([ten, d]) => ({ ten, dung: d, rieng: rieng.has(ten) }));   // rieng: màu có cột ngay trên dòng xe này
+    };
+    return { dongXe, mauCot };
+  }
+
+  // ----- Lịch xe về dự kiến: mỗi HEAD một tab "<Bình Dương|Quận 2>_Lịch xe về dự kiến Tháng m.yyyy", mỗi tháng một tab mới -----
+  const LICH_HEAD = [['HEAD 1', /^binh duong/], ['HEAD 2', /^quan 2/]];
+  // danh sách tab (tên → gid) đọc từ trang htmlview của sheet, vì gid đổi theo từng tháng
+  async function timTabLich(fetchFn) {
+    const f = fetchFn || fetch;
+    const r = await f(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/htmlview?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`Không đọc được danh sách tab: ${r.status}`);
+    const html = await r.text(), out = [];
+    for (const m of html.matchAll(/name: "((?:[^"\\]|\\.)*)"[^{}]*?gid: "(\d+)"/g)) {
+      let ten = m[1]; try { ten = JSON.parse('"' + m[1] + '"'); } catch (e) { /* giữ nguyên */ }
+      const kd = khongDau(ten);
+      if (!/lich xe ve/.test(kd)) continue;
+      const h = LICH_HEAD.find(([, re]) => re.test(kd));
+      if (h && !out.some((t) => t.gid === m[2])) out.push({ head: h[0], ten, gid: m[2] });
+    }
+    return out;
+  }
+  // một tab lịch → [{ ngay: 'yyyy-mm-dd', ten: 'AB125 tiêu chuẩn - Đen', sl, ghi_chu }]
+  function parseLich(rows) {
+    const out = [];
+    for (const r of rows) {
+      const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(r[0] || '');
+      const sl = soNguyen(r[2]);
+      if (!m || !r[1] || !sl) continue;
+      out.push({ ngay: `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`, ten: r[1].replace(/\s+/g, ' '), sl, ghi_chu: r[3] || '' });
+    }
+    return out;
+  }
+  // màu ghi trên lịch ("Đỏ", "Đen mờ", "Xám xi măng") → tên màu của tab tồn kho: trùng hẳn, không thì màu cùng chữ đầu
+  // mà mọi chữ đều có trong tên trên lịch (dài nhất), không nữa thì màu cùng chữ đầu hay dùng nhất cho dòng xe đó
+  function khopMau(mauGoc, cot) {
+    const tu = tachTu(mauGoc);
+    if (!tu.length) return '';
+    let mau = '', diem = -1;
+    const cung = cot.filter((c) => tachTu(c.ten)[0] === tu[0]);
+    for (const { ten, dung } of (cung.some((c) => c.rieng) ? cung.filter((c) => c.rieng) : cung)) {
+      const tm = tachTu(ten);
+      const d = (tm.join(' ') === tu.join(' ') ? 1e9 : 0) + (tm.every((w) => tu.includes(w)) ? tm.length * 1e6 : 0) + dung;
+      if (d > diem) { diem = d; mau = ten; }
+    }
+    return mau;
+  }
+  // csvLich: [{ head, text }]; csvTon: { 'HEAD 1': text, 'HEAD 2': text } → đổi tên theo dòng xe/màu của tab tồn kho, gộp theo (head, ngày, xe, màu)
+  function lichXeVe(csvLich, csvTon) {
+    const tabs = {};
+    for (const t of TABS) tabs[t.head] = parseTab(parseCsv(csvTon[t.head]));
+    const { dongXe, mauCot } = tenTrenSheet(tabs);
+    const nho = new Map(), gop = new Map();
+    for (const { head, text } of csvLich) for (const r of parseLich(parseCsv(text))) {
+      let d = nho.get(r.ten);
+      if (!d) {
+        const [xeGoc, mauGoc = '', ...them] = r.ten.split(/\s+-\s+/);
+        const k = docMuon(`${xeGoc} ${them.join(' ')}`, dongXe, mauCot);
+        const khop = dongXe.includes(k.xe);
+        d = { xe: khop ? k.xe : xeGoc.toUpperCase(), mau: (khop && khopMau(mauGoc, mauCot(k.xe))) || tenMau(xeGoc, mauGoc) || CHUA_MAU, khop };
+        nho.set(r.ten, d);
+      }
+      const key = [head, r.ngay, d.xe, d.mau].join('|');
+      const o = gop.get(key) || { head, ngay: r.ngay, xe: d.xe, mau: d.mau, sl: 0, ten_lich: r.ten, khop: d.khop, ghi_chu: '' };
+      o.sl += r.sl; if (r.ghi_chu && !o.ghi_chu.includes(r.ghi_chu)) o.ghi_chu += (o.ghi_chu ? ', ' : '') + r.ghi_chu;
+      gop.set(key, o);
+    }
+    return [...gop.values()].sort((a, b) => (a.ngay < b.ngay ? -1 : a.ngay > b.ngay ? 1 : 0));
+  }
+  async function fetchLich(fetchFn) {
+    const f = fetchFn || fetch;
+    const tabs = await timTabLich(f);
+    if (!tabs.length) throw new Error('Không thấy tab "Lịch xe về dự kiến" trên sheet');
+    return Promise.all(tabs.map(async (t) => {
+      const r = await f(csvUrl(t.gid) + '&t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error(`Không đọc được tab ${t.ten}: ${r.status}`);
+      return { head: t.head, ten: t.ten, text: await r.text() };
+    }));
+  }
+
   // csv: { 'HEAD 1': text, 'HEAD 2': text }; truoc: data/*.json hiện có (để so với ngày trước)
   function snapshot(csv, truoc, now) {
     const { ngay, gio } = gioVN(now || new Date());
     const out = { ngay, gio, tong_ngay: [], giao_dich: [], ton_theo_xe: [], ton_theo_mau: [], muon_bd: [] };
     const tabs = {};
     for (const t of TABS) tabs[t.head] = parseTab(parseCsv(csv[t.head]));
-    const dongXe = [...new Set(TABS.flatMap((t) => tabs[t.head].xe.map((r) => r.xe)))];
-    const mauCot = (xe) => {
-      const dung = new Map();
-      for (const t of TABS) for (const r of tabs[t.head].mau) if (r.cot) {
-        const sh = /^(SH|ADV|ICON)/i.test(r.xe) === /^(SH|ADV|ICON)/i.test(xe);
-        if (sh) dung.set(tenMau(xe, r.cot), (dung.get(tenMau(xe, r.cot)) || 0) + r.sl + (r.xe === xe ? 1000 : 0));
-      }
-      return [...dung].map(([ten, d]) => ({ ten, dung: d }));
-    };
+    const { dongXe, mauCot } = tenTrenSheet(tabs);
 
     for (const t of TABS) {
       const tab = tabs[t.head], head = t.head;
@@ -196,6 +278,6 @@
     return out;
   }
 
-  const api = { SHEET_ID, TABS, csvUrl, parseCsv, parseTab, docMuon, snapshot, fetchCsv, merge, gioVN };
+  const api = { SHEET_ID, TABS, csvUrl, parseCsv, parseTab, docMuon, snapshot, fetchCsv, merge, gioVN, timTabLich, parseLich, lichXeVe, fetchLich };
   if (typeof module === 'object' && module.exports) module.exports = api; else root.VTQSheet = api;
 })(typeof window !== 'undefined' ? window : globalThis);
