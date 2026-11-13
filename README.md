@@ -1,6 +1,6 @@
 # Xuất nhập tồn VTQ
 
-Bảng theo dõi tồn kho xe máy Honda HEAD Việt Thái Quân — HEAD 1 (VTQ1 Bình Dương) và HEAD 2 (VTQ2 Quận 2): xe bán/xuất, nhập về, tồn theo ngày, theo dòng xe và màu; kèm lịch xe về VTQ2 theo kế hoạch giao hàng của HVN.
+Bảng theo dõi tồn kho xe máy Honda HEAD Việt Thái Quân — HEAD 1 (VTQ1 Bình Dương) và HEAD 2 (VTQ2 Quận 2): xe bán/xuất, nhập về, tồn theo ngày, theo dòng xe và màu.
 
 Trang chạy trên GitHub Pages và **đọc trực tiếp Google Sheet TỒN KHO** (tab VTQ1, VTQ2.Mới) mỗi phút: số hôm nay luôn theo sheet, không phải chờ tác vụ hằng ngày.
 
@@ -17,7 +17,6 @@ Trang chạy trên GitHub Pages và **đọc trực tiếp Google Sheet TỒN KH
 | `data/ton_theo_xe.json` | Tồn theo (ngày, HEAD, dòng xe) |
 | `data/ton_theo_mau.json` | Tồn theo (ngày, HEAD, dòng xe, màu) |
 | `data/muon_bd.json` | Xe mượn đang ở showroom của HEAD kia: VTQ2 mượn của VTQ1 (BD) và VTQ1 mượn của VTQ2 |
-| `data/giao_hang.json` | Kế hoạch giao hàng HVN tháng 10 cho VTQ2 (tab "Lịch xe về") |
 
 ## Cập nhật dữ liệu
 
